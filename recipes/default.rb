@@ -15,18 +15,32 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-#
+
 
 package "keepalived"
 
 if node['keepalived']['shared_address']
-  file '/etc/sysctl.d/60-ip-nonlocal-bind.conf' do
-    mode 0644
-    content "net.ipv4.ip_nonlocal_bind=1\n"
+  if node[:platform_version] == '6.4' and node[:platform_family] == 'rhel'
+    execute 'modify sysctl.conf' do
+      action :run
+      command "grep net.ipv4.ip_nonlocal_bind /etc/sysctl.conf > /dev/null || sed -i '$ a\ net.ipv4.ip_nonlocal_bind = 1' /etc/sysctl.conf"
+      notifies :run, 'execute[change sysctl manually]'
+    end
+    execute 'change sysctl manually' do
+      action :nothing
+      command 'sysctl -w net.ipv4.ip_nonlocal_bind=1'
+    end
+  else
+    file '/etc/sysctl.d/60-ip-nonlocal-bind.conf' do
+      mode 0644
+      content "net.ipv4.ip_nonlocal_bind=1\n"
+    end
   end
 
-  service 'procps' do
-    action :start
+  if node[:platform_family] == 'debian'
+    service 'procps' do
+      action :start
+    end
   end
 end
 
